@@ -53,6 +53,7 @@ func NewPublisher(endpoints []string, key, value string, opts ...PubOption) *Pub
 
 // KeepAlive keeps key:value alive.
 func (p *Publisher) KeepAlive() error {
+	// 获取租约 并绑定到  key{rpcname}/{leaseid} : value{rpcaddr}
 	cli, err := p.doRegister()
 	if err != nil {
 		return err
@@ -62,6 +63,7 @@ func (p *Publisher) KeepAlive() error {
 		p.Stop()
 	})
 
+	// 定期续约  保持key:value的有效性 每隔 ttl/3 续约一次
 	return p.keepAliveAsync(cli)
 }
 

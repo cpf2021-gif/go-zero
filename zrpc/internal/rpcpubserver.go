@@ -30,6 +30,7 @@ func NewRpcPubServer(etcd discov.EtcdConf, listenOn string,
 			pubOpts = append(pubOpts, discov.WithId(etcd.ID))
 		}
 		pubClient := discov.NewPublisher(etcd.Hosts, etcd.Key, pubListenOn, pubOpts...)
+		// 服务注册
 		return pubClient.KeepAlive()
 	}
 	server := keepAliveServer{
