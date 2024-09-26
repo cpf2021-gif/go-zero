@@ -56,6 +56,7 @@ func (r *Registry) Monitor(endpoints []string, key string, l UpdateListener, exa
 		}
 	}
 
+	// 监听 key 的变化
 	return c.monitor(key, l, exactMatch)
 }
 
@@ -140,6 +141,7 @@ func (c *cluster) handleChanges(key string, kvs []KV) {
 	vals, ok := c.values[key]
 	if !ok {
 		add = kvs
+		// 将kvs 保存在本地内存中，当etcd发生故障时，可以从本地内存中获取
 		vals = make(map[string]string)
 		for _, kv := range kvs {
 			vals[kv.Key] = kv.Val
@@ -198,6 +200,7 @@ func (c *cluster) handleWatchEvents(key string, events []*clientv3.Event) {
 			}
 			c.lock.Unlock()
 			for _, l := range listeners {
+				// 通知监听器 key 的值发生了变化, 更新cc.UpdateState
 				l.OnAdd(KV{
 					Key: string(ev.Kv.Key),
 					Val: string(ev.Kv.Value),
@@ -265,6 +268,7 @@ func (c *cluster) monitor(key string, l UpdateListener, exactMatch bool) error {
 		return err
 	}
 
+	// 加载 key 的值
 	rev := c.load(cli, key)
 	c.watchGroup.Run(func() {
 		c.watch(cli, key, rev)
@@ -307,6 +311,7 @@ func (c *cluster) reload(cli EtcdClient) {
 
 func (c *cluster) watch(cli EtcdClient, key string, rev int64) {
 	for {
+		// 监听 key 的变化
 		err := c.watchStream(cli, key, rev)
 		if err == nil {
 			return
@@ -351,6 +356,7 @@ func (c *cluster) watchStream(cli EtcdClient, key string, rev int64) error {
 				return fmt.Errorf("etcd monitor chan error: %w", wresp.Err())
 			}
 
+			// 处理 key 的变化
 			c.handleWatchEvents(key, wresp.Events)
 		case <-c.done:
 			return nil

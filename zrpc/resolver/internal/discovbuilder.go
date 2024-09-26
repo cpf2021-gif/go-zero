@@ -29,13 +29,16 @@ func (b *discovBuilder) Build(target resolver.Target, cc resolver.ClientConn, _ 
 				Addr: val,
 			})
 		}
+		// 调用cc.UpdateState更新服务状态
 		if err := cc.UpdateState(resolver.State{
 			Addresses: addrs,
 		}); err != nil {
 			logx.Error(err)
 		}
 	}
+	// 基于 etcd 的 watch 机制，当发生PUT和GET事件，会调用 update 方法更新服务状态
 	sub.AddListener(update)
+	// 立即更新一次服务状态
 	update()
 
 	return &nopResolver{cc: cc}, nil
