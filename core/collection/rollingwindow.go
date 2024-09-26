@@ -72,9 +72,10 @@ func (rw *RollingWindow[T, B]) Reduce(fn func(b B)) {
 	if span == 0 && rw.ignoreCurrent {
 		diff = rw.size - 1
 	} else {
-		diff = rw.size - span
+		diff = rw.size - span // 计算有效的时间片数
 	}
 	if diff > 0 {
+		// 计算最旧的时间片的offset
 		offset := (rw.offset + span + 1) % rw.size
 		rw.win.reduce(offset, diff, fn)
 	}
@@ -90,8 +91,9 @@ func (rw *RollingWindow[T, B]) span() int {
 }
 
 func (rw *RollingWindow[T, B]) updateOffset() {
+	// 计算与上次时间片的相距的时间片数
 	span := rw.span()
-	if span <= 0 {
+	if span <= 0 {  // 属于同一个时间片内, 直接返回
 		return
 	}
 
@@ -101,10 +103,11 @@ func (rw *RollingWindow[T, B]) updateOffset() {
 		rw.win.resetBucket((offset + i + 1) % rw.size)
 	}
 
+	// 更新offset
 	rw.offset = (offset + span) % rw.size
 	now := timex.Now()
 	// align to interval time boundary
-	rw.lastTime = now - (now-rw.lastTime)%rw.interval
+	rw.lastTime = now - (now-rw.lastTime)%rw.interval // 找到当前时间片的开始时间
 }
 
 // Bucket defines the bucket that holds sum and num of additions.

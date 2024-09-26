@@ -53,7 +53,9 @@ func newGoogleBreaker() *googleBreaker {
 func (b *googleBreaker) accept() error {
 	var w float64
 	history := b.history()
-	w = b.k - (b.k-minK)*float64(history.failingBuckets)/buckets
+	// 根据连续失败的bucket数调整权重, w ∈ [minK, k]
+	// 失败的bucket数越多, w越小, 降低接受请求的概率
+	w = b.k - (b.k-minK)*float64(history.failingBuckets)/buckets  
 	weightedAccepts := mathx.AtLeast(w, minK) * float64(history.accepts)
 	// https://landing.google.com/sre/sre-book/chapters/handling-overload/#eq2101
 	// for better performance, no need to care about the negative ratio
@@ -63,11 +65,13 @@ func (b *googleBreaker) accept() error {
 	}
 
 	lastPass := b.lastPass.Load()
+	// 如果距离上次通过请求的时间超过forcePassDuration, 则强制通过请求
 	if lastPass > 0 && timex.Since(lastPass) > forcePassDuration {
 		b.lastPass.Set(timex.Now())
 		return nil
 	}
 
+	// 当存在成功的bucket时, 说明系统正在恢复, 逐步增加接受请求的概率(降低dropRatio)
 	dropRatio *= float64(buckets-history.workingBuckets) / buckets
 
 	if b.proba.TrueOnProba(dropRatio) {
@@ -136,15 +140,17 @@ func (b *googleBreaker) history() windowResult {
 	b.stat.Reduce(func(b *bucket) {
 		result.accepts += b.Success
 		result.total += b.Sum
+
+		// 计算当前连续成功/失败的bucket数
 		if b.Failure > 0 {
 			result.workingBuckets = 0
 		} else if b.Success > 0 {
-			result.workingBuckets++
+			result.workingBuckets++ // 连续成功的bucket数
 		}
 		if b.Success > 0 {
 			result.failingBuckets = 0
 		} else if b.Failure > 0 {
-			result.failingBuckets++
+			result.failingBuckets++ // 连续失败的bucket数
 		}
 	})
 
