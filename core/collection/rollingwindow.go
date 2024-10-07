@@ -93,7 +93,7 @@ func (rw *RollingWindow[T, B]) span() int {
 func (rw *RollingWindow[T, B]) updateOffset() {
 	// 计算与上次时间片的相距的时间片数
 	span := rw.span()
-	if span <= 0 {  // 属于同一个时间片内, 直接返回
+	if span <= 0 { // 属于同一个时间片内, 直接返回
 		return
 	}
 

@@ -55,7 +55,7 @@ func (b *googleBreaker) accept() error {
 	history := b.history()
 	// 根据连续失败的bucket数调整权重, w ∈ [minK, k]
 	// 失败的bucket数越多, w越小, 降低接受请求的概率
-	w = b.k - (b.k-minK)*float64(history.failingBuckets)/buckets  
+	w = b.k - (b.k-minK)*float64(history.failingBuckets)/buckets
 	weightedAccepts := mathx.AtLeast(w, minK) * float64(history.accepts)
 	// https://landing.google.com/sre/sre-book/chapters/handling-overload/#eq2101
 	// for better performance, no need to care about the negative ratio
