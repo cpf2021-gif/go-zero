@@ -93,6 +93,7 @@ func (p *p2cPicker) Pick(_ balancer.PickInfo) (balancer.PickResult, error) {
 		chosen = p.choose(p.conns[0], p.conns[1])
 	default:
 		var node1, node2 *subConn
+		// 随机选取两个节点，如果两个节点都健康，则选取负载较小的节点
 		for i := 0; i < pickTimes; i++ {
 			a := p.r.Intn(len(p.conns))
 			b := p.r.Intn(len(p.conns) - 1)
@@ -133,6 +134,8 @@ func (p *p2cPicker) buildDoneFunc(c *subConn) func(info balancer.DoneInfo) {
 		// the value of w (y-axis) will decrease, inversely proportional.
 		// The function curve of y = x^(-x) is as follows:
 		// https://github.com/zeromicro/zero-doc/blob/main/doc/images/y_e_x.png?raw=true
+
+		// td越大, 历史数据的参考权重(w)越小，增大当前值的权重(1-w), 参考历史数据越少
 		w := math.Exp(float64(-td) / float64(decayTime))
 		lag := int64(now) - start
 		if lag < 0 {
@@ -168,11 +171,13 @@ func (p *p2cPicker) choose(c1, c2 *subConn) *subConn {
 		return c1
 	}
 
+	// 选取负载较小的节点
 	if c1.load() > c2.load() {
 		c1, c2 = c2, c1
 	}
 
 	pick := atomic.LoadInt64(&c2.pick)
+	// 如果负载大的节点在一段时间内没有被选中，强制选中
 	if start-pick > forcePick && atomic.CompareAndSwapInt64(&c2.pick, pick, start) {
 		return c2
 	}
@@ -201,9 +206,9 @@ type subConn struct {
 
 	// The value represents the number of requests that are either pending or just
 	// starting at the current node, and it is obtained through atomic addition.
-	inflight int64
+	inflight int64 // 当前节点的请求数
 	success  uint64
-	requests int64
+	requests int64 // 一段时间内的请求数, 用于统计与打印日志
 	last     int64
 	pick     int64
 	addr     resolver.Address
@@ -217,6 +222,7 @@ func (c *subConn) healthy() bool {
 func (c *subConn) load() int64 {
 	// plus one to avoid multiply zero
 	lag := int64(math.Sqrt(float64(atomic.LoadUint64(&c.lag) + 1)))
+	// 负载 = 延迟 * (当前节点的请求数 + 1)
 	load := lag * (atomic.LoadInt64(&c.inflight) + 1)
 	if load == 0 {
 		return penalty
